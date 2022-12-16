@@ -37,7 +37,7 @@ Support for retrieving and updating individual pixels or blocks of pixels in the
 Installation
 To use the QuadTree for PNG compression, clone this repository and include the quadtree.h file in your project.
 ```
-git clone https://github.com/user/quadtree-png-compression.git
+git clone https://github.com/DrThorium/QuadTreeRGB.git
 ```
 The code uses the lodepng to load and export the png files, here's the repo:  
 https://github.com/lvandeve/lodepng
