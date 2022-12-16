@@ -8,20 +8,18 @@
 #include <iostream>
 #include <vector>
 #include <list>
+#include "lodepng.cpp"
 
 int tolerance_;
 
 class QuadTree {
 private:
 
-
     void setTolerance(int tol_){
         tolerance_ = tol_;
     }
 
     struct Pixel {
-
-
 
         int R_{}, G_{}, B_{}, A_{};
 
@@ -61,10 +59,6 @@ private:
     int size_{};
     std::vector<std::vector<std::vector<int>>> main_matrix_;
 
-
-
-private:
-
     static std::vector<std::vector<std::vector<Pixel>>> split_grid(const std::vector<std::vector<Pixel>> &grid) {
         int m = static_cast<int>(grid.size());
         int n = static_cast<int>(grid[0].size());
@@ -98,11 +92,10 @@ private:
     }
 
     QuadTreeNode *buildQuadTree(std::vector<std::vector<Pixel>> &grid, int x, int y, int size) {
-        bool equal_ = true;
-        Pixel test_ = grid[0][0];
+        Pixel median_pixel_ = promPixel(size, grid);
         for (int q = 0; q < size; q++) {
             for (int p = 0; p < size; p++) {
-                if (test_ != grid[q][p]){
+                if (median_pixel_ != grid[q][p]){
                     std::vector<std::vector<std::vector<Pixel>>> splitGrid = split_grid(grid);
                     auto *node = new QuadTreeNode(false, {0, 0, 0, 0});
                     for (int i = 0; i < 4; ++i) {
@@ -112,14 +105,7 @@ private:
                 };
             }
         }
-        Pixel median_pixel_ = promPixel(size, grid);
         return new QuadTreeNode(true, median_pixel_);
-    }
-
-public:
-
-    QuadTree() {
-        root_ = QuadTreeNode();
     }
 
     explicit QuadTree(const std::vector<std::vector<std::vector<int>>> &input_grid, int tol_ = 0) {
@@ -140,7 +126,7 @@ public:
         root_ = *buildQuadTree(grid_built, 0, 0, size_);
     }
 
-    void printGrid() {
+    void buildGrid() {
         main_matrix_.resize(size_, std::vector<std::vector<int>>(size_, std::vector<int>(4, 0)));
         printGrid(&root_, 0, 0, size_);
     }
@@ -163,10 +149,101 @@ public:
         }
     }
 
+    void saveImage(const std::vector<std::vector<std::vector<int>>> &image, const std::string& filename) {
+        // Determine the width and height of the image
+        int width = static_cast<int>(image[0].size());
+        int height = static_cast<int>(image.size());
+
+        // Allocate memory for the image data
+        std::vector<unsigned char> data(width * height * 4);
+
+        // Copy the image data into the data vector
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                data[y * width * 4 + x * 4 + 0] = image[y][x][0];
+                data[y * width * 4 + x * 4 + 1] = image[y][x][1];
+                data[y * width * 4 + x * 4 + 2] = image[y][x][2];
+                data[y * width * 4 + x * 4 + 3] = image[y][x][3];
+            }
+        }
+
+        // Encode the image data and save it to a file
+        unsigned error = lodepng::encode(filename, data, width, height);
+
+        // Check for encoding errors
+        if (error) {
+            throw std::runtime_error("Error saving PNG image: " + std::to_string(error));
+        }
+        else{
+            std::cout << "Success! ... saved png image at: ./" << filename << std::endl;
+        }
+    }
+
+    std::vector<std::vector<std::vector<int>>> readPNGImage(const std::string& filename)
+    {
+        std::vector<unsigned char> image;
+        unsigned width, height;
+        unsigned error = lodepng::decode(image, width, height, filename);
+
+        if (error)
+        {
+            throw std::runtime_error("Error loading PNG image: " + std::to_string(error));
+        }
+
+        std::vector<std::vector<std::vector<int>>> pixels;
+        pixels.resize(height);
+        for (unsigned i = 0; i < height; ++i)
+        {
+            pixels[i].resize(width);
+            for (unsigned j = 0; j < width; ++j)
+            {
+                pixels[i][j].resize(4); // 4 ints per pixel (RGBA)
+            }
+        }
+
+        for (unsigned y = 0; y < height; ++y)
+        {
+            for (unsigned x = 0; x < width; ++x)
+            {
+                const unsigned char* pixel = &image[(y * width + x) * 4];
+                pixels[y][x][0] = static_cast<int>(pixel[0]);
+                pixels[y][x][1] = static_cast<int>(pixel[1]);
+                pixels[y][x][2] = static_cast<int>(pixel[2]);
+                pixels[y][x][3] = static_cast<int>(pixel[3]);
+            }
+        }
+
+        return pixels;
+    }
+
+
+    void ensurePNGExtension(std::string& fileName) {
+        if (fileName.size() < 4 || fileName.substr(fileName.size() - 4) != ".png") {
+            fileName += ".png";
+        }
+    }
+
     const std::vector<std::vector<std::vector<int>>> &getMainMatrix() {
-        this->printGrid();
+        this->buildGrid();
         return main_matrix_;
     }
+
+public:
+
+    QuadTree(){
+        root_ = QuadTreeNode();
+    };
+
+    void compress(std::string filename_, int tol_){
+        ensurePNGExtension(filename_);
+        std::vector<std::vector<std::vector<int>>> input_grid_ = readPNGImage(filename_);
+        QuadTree qt_ = QuadTree(input_grid_, tol_);
+        filename_.insert(filename_.size() - 4, "-EXIT");
+        saveImage(qt_.getMainMatrix(), filename_);
+        main_matrix_.clear();
+    }
+
+
 };
 
 
